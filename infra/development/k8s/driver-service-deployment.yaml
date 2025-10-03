@@ -1,22 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: trip-service
+  name: driver-service
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: trip-service
+      app: driver-service
   template:
     metadata:
       labels:
-        app: trip-service
+        app: driver-service
     spec:
       containers:
-        - name: trip-service
-          image: ride-sharing/trip-service
+        - name: driver-service
+          image: ride-sharing/driver-service
+          imagePullPolicy: Never
           ports:
-            - containerPort: 9093
+            - containerPort: 9092
           resources:
             requests:
               memory: "64Mi"
@@ -28,12 +29,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: trip-service
+  name: driver-service
 spec:
-  selector:
-    app: trip-service
-  ports:
-    - port: 9093
-      name: http
-      targetPort: 9093
   type: ClusterIP
+  ports:
+    - port: 9092
+      name: grpc
+      targetPort: 9092
+  selector:
+    app: driver-service

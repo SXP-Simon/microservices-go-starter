@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package trip;
+
+option go_package = "shared/proto/trip;trip";
+
+service TripService {
+  rpc PreviewTrip  (PreviewTripRequest) returns (PreviewTripResponse);
+  rpc CreateTrip (CreteTripRequest) returns (CreateTripResponse);
+}
+
+message PreviewTripRequest{
+  string userID = 1;
+  Coordinate startLocation = 2;
+  Coordinate endLocation = 3;
+
+}
+
+message PreviewTripResponse{
+  string tripID = 1;
+  Route route = 2;
+  repeated RideFare rideFares = 3;
+}
+
+
+message Route{
+  repeated Geometry geometry = 1;
+  double distance = 2;
+  double duration = 3;
+
+}
+message Geometry {
+  repeated Coordinate coordinates = 1;
+}
+message Coordinate{
+  double latitude = 1;
+  double longitude = 2;
+}
+message RideFare{
+  string id = 1;
+  string userID = 2;
+  string packageSlug = 3;
+  double totalPriceInCents = 4;
+}
+
+message CreteTripRequest{
+  string rideFareID = 1;
+  string userID = 2;
+
+}
+
+message CreateTripResponse{
+  string tripID = 1;
+  Trip trip = 2;
+}
+
+message Trip{
+  string id = 1;
+  RideFare selectedFare = 2;
+  Route route = 3;
+  string status = 4;
+  string userID = 5;
+  TripDriver driver = 6;
+}
+
+// Static driver object that is used to store the driver info
+message TripDriver{
+  string id = 1;
+  string name = 2;
+  string profilePicture = 3;
+  string carPalate = 4;
+}

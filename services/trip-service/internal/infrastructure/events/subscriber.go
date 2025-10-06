@@ -100,12 +100,12 @@ func (s *TripEventSubscriber) handleDriverAcceptTrip(data []byte) error {
 		return fmt.Errorf("解析司机接受行程响应失败: %w", err)
 	}
 
-	// TODO: 实现司机接受行程的业务逻辑
-	// 1. 更新行程状态
-	// 2. 分配司机
-	// 3. 发布司机分配事件
+	// 处理司机接受行程的业务逻辑
+	if err := s.service.AcceptTrip(context.Background(), response.TripID, response.DriverID); err != nil {
+		return fmt.Errorf("处理司机接受行程失败: %w", err)
+	}
 
-	log.Printf("处理司机接受行程事件: 行程ID=%s, 司机ID=%s", response.TripID, response.DriverID)
+	log.Printf("成功处理司机接受行程事件: 行程ID=%s, 司机ID=%s", response.TripID, response.DriverID)
 	return nil
 }
 
@@ -116,12 +116,12 @@ func (s *TripEventSubscriber) handleDriverDeclineTrip(data []byte) error {
 		return fmt.Errorf("解析司机拒绝行程响应失败: %w", err)
 	}
 
-	// TODO: 实现司机拒绝行程的业务逻辑
-	// 1. 记录司机拒绝
-	// 2. 查找下一个可用司机
-	// 3. 如果没有更多司机，发布未找到司机事件
+	// 处理司机拒绝行程的业务逻辑
+	if err := s.service.DeclineTrip(context.Background(), response.TripID, response.DriverID); err != nil {
+		return fmt.Errorf("处理司机拒绝行程失败: %w", err)
+	}
 
-	log.Printf("处理司机拒绝行程事件: 行程ID=%s, 司机ID=%s", response.TripID, response.DriverID)
+	log.Printf("成功处理司机拒绝行程事件: 行程ID=%s, 司机ID=%s", response.TripID, response.DriverID)
 	return nil
 }
 
@@ -132,11 +132,12 @@ func (s *TripEventSubscriber) handlePaymentSuccess(data []byte) error {
 		return fmt.Errorf("解析支付成功事件失败: %w", err)
 	}
 
-	// TODO: 实现支付成功的业务逻辑
-	// 1. 更新行程状态为"已支付"
-	// 2. 通知司机开始行程
+	// 处理支付成功的业务逻辑
+	if err := s.service.UpdatePaymentStatus(context.Background(), paymentEvent.TripID, "paid"); err != nil {
+		return fmt.Errorf("处理支付成功失败: %w", err)
+	}
 
-	log.Printf("处理支付成功事件: 行程ID=%s", paymentEvent.TripID)
+	log.Printf("成功处理支付成功事件: 行程ID=%s", paymentEvent.TripID)
 	return nil
 }
 
@@ -147,12 +148,12 @@ func (s *TripEventSubscriber) handlePaymentFailed(data []byte) error {
 		return fmt.Errorf("解析支付失败事件失败: %w", err)
 	}
 
-	// TODO: 实现支付失败的业务逻辑
-	// 1. 更新行程状态为"支付失败"
-	// 2. 释放司机
-	// 3. 通知乘客支付失败
+	// 处理支付失败的业务逻辑
+	if err := s.service.UpdatePaymentStatus(context.Background(), paymentEvent.TripID, "payment_failed"); err != nil {
+		return fmt.Errorf("处理支付失败失败: %w", err)
+	}
 
-	log.Printf("处理支付失败事件: 行程ID=%s", paymentEvent.TripID)
+	log.Printf("成功处理支付失败事件: 行程ID=%s", paymentEvent.TripID)
 	return nil
 }
 

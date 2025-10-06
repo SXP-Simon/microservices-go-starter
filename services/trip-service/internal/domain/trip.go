@@ -19,8 +19,10 @@ type TripModel struct {
 type TripRepository interface {
 	CreateTrip(ctx context.Context, trip *TripModel) (*TripModel, error)
 	SaveRideFare(ctx context.Context, f *RideFareModel) error
-
 	GetRideFareByID(ctx context.Context, id string) (*RideFareModel, error)
+	GetTripByID(ctx context.Context, id string) (*TripModel, error)
+	UpdateTripStatus(ctx context.Context, tripID string, status string) error
+	AssignDriver(ctx context.Context, tripID string, driver *pb.TripDriver) error
 }
 
 type TripService interface {
@@ -29,6 +31,9 @@ type TripService interface {
 	EstimatePackagesPriceWithRoute(route *tripTypes.OsrmApiResponse) []*RideFareModel
 	GenerateTripFares(ctx context.Context, fares []*RideFareModel, userID string, route *tripTypes.OsrmApiResponse) ([]*RideFareModel, error)
 	GetAndValidateFare(ctx context.Context, fareID, userID string) (*RideFareModel, error)
+	AcceptTrip(ctx context.Context, tripID, driverID string) error
+	DeclineTrip(ctx context.Context, tripID, driverID string) error
+	UpdatePaymentStatus(ctx context.Context, tripID, status string) error
 }
 
 // TripEventPublisher 行程事件发布器接口

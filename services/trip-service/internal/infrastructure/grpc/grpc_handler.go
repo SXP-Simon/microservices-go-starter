@@ -68,7 +68,7 @@ func (h *gRPCHandler) PreviewTrip(ctx context.Context, req *pb.PreviewTripReques
 		return nil, status.Errorf(codes.Internal, "failed to get route %v", err)
 	}
 
-	// Estimate the ride
+	// 估算行程费用
 	estimatedFares := h.service.EstimatePackagesPriceWithRoute(route)
 
 	fares, err := h.service.GenerateTripFares(ctx, estimatedFares, userID, route)

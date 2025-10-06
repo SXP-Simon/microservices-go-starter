@@ -10,7 +10,7 @@ import (
 type RideFareModel struct {
 	ID                primitive.ObjectID
 	UserID            string
-	PackageSlug       string // ex: van, luxury, sedan
+	PackageSlug       string // 例如：van, luxury, sedan
 	TotalPriceInCents float64
 	ExpiresAt         time.Time
 	Route             *tripTypes.OsrmApiResponse

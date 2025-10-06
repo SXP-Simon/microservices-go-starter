@@ -9,7 +9,7 @@ import (
 )
 
 type TripModel struct {
-	ID       primitive.ObjectID // To avoid conflicts with mongo
+	ID       primitive.ObjectID // 避免与MongoDB冲突
 	UserID   string
 	Status   string
 	RideFare *RideFareModel

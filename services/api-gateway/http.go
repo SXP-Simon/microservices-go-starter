@@ -48,7 +48,7 @@ func HandleTripPreview(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
-	// validation
+	// 验证
 
 	if reqBody.UserID == "" {
 		http.Error(w, "failed to parse JSON data", http.StatusBadRequest)
@@ -63,7 +63,7 @@ func HandleTripPreview(w http.ResponseWriter, r *http.Request) {
 
 	defer tripService.Close()
 
-	// TODO: Call trip service
+	// TODO: 调用Trip服务
 	//resp, err := http.Post("http://trip-service:8083/preview", "application/json", reader)
 	//
 	//if err != nil {

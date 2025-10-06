@@ -5,7 +5,7 @@ import (
 	"ride-sharing/shared/types"
 )
 
-// holds the types that FE sends to the BE
+// 存储前端发送到后端的类型
 type previewTripRequest struct {
 	UserID      string           `json:"userID"`
 	Pickup      types.Coordinate `json:"pickUp"`

@@ -14,12 +14,14 @@ import (
 )
 
 type service struct {
-	repo domain.TripRepository
+	repo     domain.TripRepository
+	publisher domain.TripEventPublisher
 }
 
-func NewService(repo domain.TripRepository) *service {
+func NewService(repo domain.TripRepository, publisher domain.TripEventPublisher) *service {
 	return &service{
-		repo: repo,
+		repo:     repo,
+		publisher: publisher,
 	}
 }
 func (s *service) CreateTrip(ctx context.Context, fare *domain.RideFareModel) (*domain.TripModel, error) {
@@ -30,7 +32,22 @@ func (s *service) CreateTrip(ctx context.Context, fare *domain.RideFareModel) (*
 		RideFare: fare,
 		Driver:   &trip.TripDriver{},
 	}
-	return s.repo.CreateTrip(ctx, t)
+	
+	// 保存行程到数据库
+	trip, err := s.repo.CreateTrip(ctx, t)
+	if err != nil {
+		return nil, err
+	}
+	
+	// 发布行程创建事件
+	if s.publisher != nil {
+		if err := s.publisher.PublishTripCreated(ctx, trip); err != nil {
+			// 记录错误但不中断流程
+			fmt.Printf("发布行程创建事件失败: %v\n", err)
+		}
+	}
+	
+	return trip, nil
 }
 
 func (s *service) GetRoute(ctx context.Context, pickup, destination *types.Coordinate) (*tripTypes.OsrmApiResponse, error) {

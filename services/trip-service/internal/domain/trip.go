@@ -28,6 +28,14 @@ type TripService interface {
 	GetRoute(ctx context.Context, pickup, destination *types.Coordinate) (*tripTypes.OsrmApiResponse, error)
 	EstimatePackagesPriceWithRoute(route *tripTypes.OsrmApiResponse) []*RideFareModel
 	GenerateTripFares(ctx context.Context, fares []*RideFareModel, userID string, route *tripTypes.OsrmApiResponse) ([]*RideFareModel, error)
-
 	GetAndValidateFare(ctx context.Context, fareID, userID string) (*RideFareModel, error)
+}
+
+// TripEventPublisher 行程事件发布器接口
+type TripEventPublisher interface {
+	PublishTripCreated(ctx context.Context, trip *TripModel) error
+	PublishDriverAssigned(ctx context.Context, trip *TripModel) error
+	PublishNoDriversFound(ctx context.Context, tripID string) error
+	PublishDriverNotInterested(ctx context.Context, tripID, driverID string) error
+	Close() error
 }

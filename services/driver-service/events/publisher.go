@@ -58,25 +58,35 @@ func (p *DriverEventPublisher) PublishDriverResponse(ctx context.Context, respon
 	return nil
 }
 
-// PublishDriverLocation 发布司机位置更新命令
-func (p *DriverEventPublisher) PublishDriverLocation(ctx context.Context, driverID string, location *Coordinate) error {
-	locationUpdate := DriverLocationUpdate{
-		DriverID: driverID,
-		Location: location,
-		Timestamp: time.Now().Unix(),
-	}
-	
+// PublishDriverLocationUpdate 发布司机位置更新命令
+func (p *DriverEventPublisher) PublishDriverLocationUpdate(ctx context.Context, update DriverLocationUpdate) error {
 	// 发布命令
-	err := p.publisher.PublishCommand(sharedContracts.DriverCmdLocation, locationUpdate)
+	err := p.publisher.PublishCommand(sharedContracts.DriverCmdLocation, update)
 	if err != nil {
 		return fmt.Errorf("发布司机位置更新命令失败: %w", err)
 	}
 	
-	log.Printf("成功发布司机位置更新命令: 司机ID=%s", driverID)
+	log.Printf("成功发布司机位置更新命令: 司机ID=%s", update.DriverID)
 	return nil
 }
 
 // Close 关闭发布器
 func (p *DriverEventPublisher) Close() error {
 	return p.publisher.Close()
+}
+
+// DriverTripResponse 司机行程响应
+type DriverTripResponse struct {
+	TripID   string `json:"tripID"`
+	RiderID  string `json:"riderID"`
+	DriverID string `json:"driverID"`
+	Accept   bool   `json:"accept"`
+}
+
+// DriverLocationUpdate 司机位置更新
+type DriverLocationUpdate struct {
+	DriverID string  `json:"driverID"`
+	Latitude float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+	Timestamp int64  `json:"timestamp"`
 }

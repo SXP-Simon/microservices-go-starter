@@ -10,6 +10,7 @@ import (
 	"ride-sharing/shared/events"
 	"ride-sharing/shared/contracts"
 	pb "ride-sharing/shared/proto/trip"
+	driverPb "ride-sharing/shared/proto/driver"
 )
 
 // DriverEventSubscriber Driver服务事件订阅器
@@ -40,7 +41,17 @@ func (s *DriverEventSubscriber) SubscribeToTripEvents(ctx context.Context) error
 		return fmt.Errorf("订阅行程创建事件失败: %w", err)
 	}
 
-	log.Println("成功订阅行程事件")
+	// 订阅司机位置更新命令
+	err = s.subscriber.Subscribe(
+		"driver_location_update_queue",
+		contracts.DriverCmdLocation,
+		s.handleDriverLocationUpdate,
+	)
+	if err != nil {
+		return fmt.Errorf("订阅司机位置更新事件失败: %w", err)
+	}
+
+	log.Println("成功订阅行程事件和司机位置更新事件")
 	return nil
 }
 
@@ -92,6 +103,28 @@ func (s *DriverEventSubscriber) handleTripCreated(data []byte) error {
 	return nil
 }
 
+// handleDriverLocationUpdate 处理司机位置更新命令
+func (s *DriverEventSubscriber) handleDriverLocationUpdate(data []byte) error {
+	var locationUpdate DriverLocationUpdate
+	if err := json.Unmarshal(data, &locationUpdate); err != nil {
+		return fmt.Errorf("解析司机位置更新命令失败: %w", err)
+	}
+
+	// 转换为服务层所需的位置格式
+	location := &driverPb.Location{
+		Latitude:  locationUpdate.Location.Latitude,
+		Longitude: locationUpdate.Location.Longitude,
+	}
+
+	// 更新司机位置
+	s.service.UpdateDriverLocation(locationUpdate.DriverID, location)
+	
+	log.Printf("已更新司机位置: 司机ID=%s, 位置=(%.6f, %.6f)",
+		locationUpdate.DriverID, locationUpdate.Location.Latitude, locationUpdate.Location.Longitude)
+	
+	return nil
+}
+
 // publishDriverTripRequest 发布司机行程请求命令
 func (s *DriverEventSubscriber) publishDriverTripRequest(request DriverTripRequest) error {
 	if s.publisher == nil {
@@ -117,6 +150,7 @@ type Coordinate struct {
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
 }
+
 
 // Close 关闭订阅器
 func (s *DriverEventSubscriber) Close() error {

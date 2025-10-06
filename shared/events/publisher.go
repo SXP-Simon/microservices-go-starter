@@ -166,6 +166,64 @@ func (p *RabbitMQPublisher) monitorConnection() {
 	err := <-errChan
 	if err != nil {
 		log.Printf("RabbitMQ连接关闭: %v", err)
-		// TODO: 实现重连逻辑
+		// 尝试重连
+		go p.reconnect()
 	}
+}
+
+// reconnect 尝试重新连接RabbitMQ
+func (p *RabbitMQPublisher) reconnect() {
+	log.Printf("尝试重新连接RabbitMQ...")
+	
+	// 需要从环境变量或配置获取URL
+	amqpURL := "amqp://guest:guest@localhost:5672/" // 默认URL
+	
+	for i := 0; i < 5; i++ {
+		// 等待一段时间后重试
+		time.Sleep(time.Duration(i+1) * time.Second)
+		
+		// 尝试重新连接
+		conn, err := amqp091.Dial(amqpURL)
+		if err != nil {
+			log.Printf("重连失败(尝试 %d/5): %v", i+1, err)
+			continue
+		}
+		
+		// 创建通道
+		ch, err := conn.Channel()
+		if err != nil {
+			conn.Close()
+			log.Printf("创建通道失败(尝试 %d/5): %v", i+1, err)
+			continue
+		}
+		
+		// 声明交换器
+		err = ch.ExchangeDeclare(
+			p.exchange, // 交换器名称
+			"topic",    // 交换器类型
+			true,       // 持久化
+			false,      // 自动删除
+			false,      // 内部使用
+			false,      // 不等待
+			nil,        // 参数
+		)
+		if err != nil {
+			ch.Close()
+			conn.Close()
+			log.Printf("声明交换器失败(尝试 %d/5): %v", i+1, err)
+			continue
+		}
+		
+		// 更新连接
+		p.conn.Close()
+		p.channel.Close()
+		p.conn = conn
+		p.channel = ch
+		
+		log.Printf("RabbitMQ重连成功")
+		go p.monitorConnection()
+		return
+	}
+	
+	log.Printf("RabbitMQ重连失败，已达到最大重试次数")
 }

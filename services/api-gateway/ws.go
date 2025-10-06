@@ -140,6 +140,7 @@ func HandleDriversWebSocket(wsManager *websocket.WebSocketManager, eventPublishe
 func handleRiderMessage(userID string, message []byte) error {
 	var wsMessage contracts.WSMessage
 	if err := json.Unmarshal(message, &wsMessage); err != nil {
+		log.Printf("解析乘客消息失败: 用户ID=%s, 错误=%v", userID, err)
 		return err
 	}
 	
@@ -155,6 +156,7 @@ func handleRiderMessage(userID string, message []byte) error {
 func handleDriverMessage(driverID string, message []byte, eventPublisher *events.GatewayEventPublisher) error {
 	var wsMessage contracts.WSMessage
 	if err := json.Unmarshal(message, &wsMessage); err != nil {
+		log.Printf("解析司机消息失败: 司机ID=%s, 错误=%v", driverID, err)
 		return err
 	}
 	
@@ -177,28 +179,25 @@ func handleDriverTripResponse(driverID string, wsMessage contracts.WSMessage, ev
 	// 解析响应数据
 	var responseData map[string]interface{}
 	if err := json.Unmarshal(wsMessage.Data.([]byte), &responseData); err != nil {
+		log.Printf("解析司机响应数据失败: 司机ID=%s, 错误=%v", driverID, err)
 		return err
 	}
 	
 	tripID, ok := responseData["tripID"].(string)
 	if !ok {
+		log.Printf("司机响应中缺少行程ID: 司机ID=%s", driverID)
 		return fmt.Errorf("缺少行程ID")
 	}
 	
 	riderID, ok := responseData["riderID"].(string)
 	if !ok {
+		log.Printf("司机响应中缺少乘客ID: 司机ID=%s", driverID)
 		return fmt.Errorf("缺少乘客ID")
 	}
 	
 	accept := wsMessage.Type == contracts.DriverCmdTripAccept
 	
-	// 创建响应数据
-	response := map[string]interface{}{
-		"tripID":   tripID,
-		"riderID":  riderID,
-		"driverID": driverID,
-		"accept":   accept,
-	}
+	log.Printf("处理司机行程响应: 司机ID=%s, 行程ID=%s, 接受=%v", driverID, tripID, accept)
 	
 	// 发布司机响应命令到RabbitMQ
 	if eventPublisher != nil {
@@ -211,9 +210,13 @@ func handleDriverTripResponse(driverID string, wsMessage contracts.WSMessage, ev
 		
 		if err := eventPublisher.PublishDriverTripResponse(context.Background(), response); err != nil {
 			log.Printf("发布司机响应命令失败: %v", err)
+			return err
 		}
+		
+		log.Printf("成功发布司机响应命令: 司机ID=%s, 行程ID=%s", driverID, tripID)
 	} else {
 		log.Printf("事件发布器未初始化，无法发布司机响应")
+		return fmt.Errorf("事件发布器未初始化")
 	}
 	
 	return nil
@@ -224,18 +227,23 @@ func handleDriverLocationUpdate(driverID string, wsMessage contracts.WSMessage, 
 	// 解析位置数据
 	var locationData map[string]interface{}
 	if err := json.Unmarshal(wsMessage.Data.([]byte), &locationData); err != nil {
+		log.Printf("解析司机位置数据失败: 司机ID=%s, 错误=%v", driverID, err)
 		return err
 	}
 	
 	latitude, ok := locationData["latitude"].(float64)
 	if !ok {
+		log.Printf("司机位置更新中缺少纬度信息: 司机ID=%s", driverID)
 		return fmt.Errorf("缺少纬度信息")
 	}
 	
 	longitude, ok := locationData["longitude"].(float64)
 	if !ok {
+		log.Printf("司机位置更新中缺少经度信息: 司机ID=%s", driverID)
 		return fmt.Errorf("缺少经度信息")
 	}
+	
+	log.Printf("处理司机位置更新: 司机ID=%s, 位置=(%.6f, %.6f)", driverID, latitude, longitude)
 	
 	// 发布司机位置更新事件
 	if eventPublisher != nil {
@@ -248,9 +256,13 @@ func handleDriverLocationUpdate(driverID string, wsMessage contracts.WSMessage, 
 		
 		if err := eventPublisher.PublishDriverLocationUpdate(context.Background(), locationUpdate); err != nil {
 			log.Printf("发布司机位置更新命令失败: %v", err)
+			return err
 		}
+		
+		log.Printf("成功发布司机位置更新命令: 司机ID=%s", driverID)
 	} else {
 		log.Printf("事件发布器未初始化，无法发布司机位置更新")
+		return fmt.Errorf("事件发布器未初始化")
 	}
 	
 	return nil

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/rabbitmq/amqp091-go"
 	"ride-sharing/shared/contracts"
@@ -58,6 +59,9 @@ func NewRabbitMQSubscriber(amqpURL, exchange string) (*RabbitMQSubscriber, error
 		channel: ch,
 		exchange: exchange,
 	}
+
+	// 启动连接监控
+	go subscriber.monitorConnection()
 
 	return subscriber, nil
 }
@@ -159,4 +163,74 @@ func (s *RabbitMQSubscriber) Close() error {
 		s.conn.Close()
 	}
 	return nil
+}
+
+// monitorConnection 监控连接状态
+func (s *RabbitMQSubscriber) monitorConnection() {
+	errChan := make(chan *amqp091.Error)
+	s.channel.NotifyClose(errChan)
+
+	err := <-errChan
+	if err != nil {
+		log.Printf("RabbitMQ订阅器连接关闭: %v", err)
+		// 尝试重连
+		go s.reconnect()
+	}
+}
+
+// reconnect 尝试重新连接RabbitMQ
+func (s *RabbitMQSubscriber) reconnect() {
+	log.Printf("尝试重新连接RabbitMQ订阅器...")
+	
+	// 需要从环境变量或配置获取URL
+	amqpURL := "amqp://guest:guest@localhost:5672/" // 默认URL
+	
+	for i := 0; i < 5; i++ {
+		// 等待一段时间后重试
+		time.Sleep(time.Duration(i+1) * time.Second)
+		
+		// 尝试重新连接
+		conn, err := amqp091.Dial(amqpURL)
+		if err != nil {
+			log.Printf("订阅器重连失败(尝试 %d/5): %v", i+1, err)
+			continue
+		}
+		
+		// 创建通道
+		ch, err := conn.Channel()
+		if err != nil {
+			conn.Close()
+			log.Printf("订阅器创建通道失败(尝试 %d/5): %v", i+1, err)
+			continue
+		}
+		
+		// 声明交换器
+		err = ch.ExchangeDeclare(
+			s.exchange, // 交换器名称
+			"topic",    // 交换器类型
+			true,       // 持久化
+			false,      // 自动删除
+			false,      // 内部使用
+			false,      // 不等待
+			nil,        // 参数
+		)
+		if err != nil {
+			ch.Close()
+			conn.Close()
+			log.Printf("订阅器声明交换器失败(尝试 %d/5): %v", i+1, err)
+			continue
+		}
+		
+		// 更新连接
+		s.conn.Close()
+		s.channel.Close()
+		s.conn = conn
+		s.channel = ch
+		
+		log.Printf("RabbitMQ订阅器重连成功")
+		go s.monitorConnection()
+		return
+	}
+	
+	log.Printf("RabbitMQ订阅器重连失败，已达到最大重试次数")
 }

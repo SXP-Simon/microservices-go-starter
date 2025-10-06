@@ -27,7 +27,7 @@ func NewTripEventPublisher(publisher events.Publisher) *TripEventPublisher {
 // PublishTripCreated 发布行程创建事件
 func (p *TripEventPublisher) PublishTripCreated(ctx context.Context, trip *domain.TripModel) error {
 	// 转换为protobuf格式
-	tripProto := p.convertTripToProto(trip)
+	tripProto := trip.ToProto()
 	
 	// 发布事件
 	err := p.publisher.PublishEvent(contracts.TripEventCreated, tripProto)
@@ -42,7 +42,7 @@ func (p *TripEventPublisher) PublishTripCreated(ctx context.Context, trip *domai
 // PublishDriverAssigned 发布司机分配事件
 func (p *TripEventPublisher) PublishDriverAssigned(ctx context.Context, trip *domain.TripModel) error {
 	// 转换为protobuf格式
-	tripProto := p.convertTripToProto(trip)
+	tripProto := trip.ToProto()
 	
 	// 发布事件
 	err := p.publisher.PublishEvent(contracts.TripEventDriverAssigned, tripProto)
@@ -89,29 +89,6 @@ func (p *TripEventPublisher) PublishDriverNotInterested(ctx context.Context, tri
 	return nil
 }
 
-// convertTripToProto 将TripModel转换为protobuf格式
-func (p *TripEventPublisher) convertTripToProto(trip *domain.TripModel) *pb.Trip {
-	// 转换行程费用
-	var rideFare *pb.RideFare
-	if trip.RideFare != nil {
-		rideFare = trip.RideFare.ToProto()
-	}
-	
-	// 转换路线
-	var route *pb.Route
-	if trip.RideFare != nil && trip.RideFare.Route != nil {
-		route = trip.RideFare.Route.ToProto()
-	}
-	
-	return &pb.Trip{
-		Id:           trip.ID.Hex(),
-		UserID:       trip.UserID,
-		Status:       trip.Status,
-		SelectedFare: rideFare,
-		Route:        route,
-		Driver:       trip.Driver,
-	}
-}
 
 // Close 关闭发布器
 func (p *TripEventPublisher) Close() error {

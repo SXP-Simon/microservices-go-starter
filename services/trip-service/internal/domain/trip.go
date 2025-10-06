@@ -44,3 +44,27 @@ type TripEventPublisher interface {
 	PublishDriverNotInterested(ctx context.Context, tripID, driverID string) error
 	Close() error
 }
+
+// ToProto 将TripModel转换为protobuf格式
+func (t *TripModel) ToProto() *pb.Trip {
+	// 转换行程费用
+	var rideFare *pb.RideFare
+	if t.RideFare != nil {
+		rideFare = t.RideFare.ToProto()
+	}
+	
+	// 转换路线
+	var route *pb.Route
+	if t.RideFare != nil && t.RideFare.Route != nil {
+		route = t.RideFare.Route.ToProto()
+	}
+	
+	return &pb.Trip{
+		Id:           t.ID.Hex(),
+		UserID:       t.UserID,
+		Status:       t.Status,
+		SelectedFare: rideFare,
+		Route:        route,
+		Driver:       t.Driver,
+	}
+}

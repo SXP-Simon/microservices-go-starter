@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"time"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
@@ -18,10 +21,9 @@ var (
 			return true
 		},
 	}
-	wsManager *websocket.WebSocketManager
 )
 
-func HandleRidersWebSocket(w http.ResponseWriter, r *http.Request) {
+func HandleRidersWebSocket(wsManager *websocket.WebSocketManager, eventPublisher *events.GatewayEventPublisher, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket升级失败: %v", err)
@@ -55,7 +57,7 @@ func HandleRidersWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func HandleDriversWebSocket(w http.ResponseWriter, r *http.Request) {
+func HandleDriversWebSocket(wsManager *websocket.WebSocketManager, eventPublisher *events.GatewayEventPublisher, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket升级失败: %v", err)
@@ -118,7 +120,7 @@ func HandleDriversWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 		
 		// 处理来自司机的消息
-		if err := handleDriverMessage(userID, message); err != nil {
+		if err := handleDriverMessage(userID, message, eventPublisher); err != nil {
 			log.Printf("处理司机消息失败: %v", err)
 		}
 	}
@@ -150,7 +152,7 @@ func handleRiderMessage(userID string, message []byte) error {
 }
 
 // handleDriverMessage 处理司机消息
-func handleDriverMessage(driverID string, message []byte) error {
+func handleDriverMessage(driverID string, message []byte, eventPublisher *events.GatewayEventPublisher) error {
 	var wsMessage contracts.WSMessage
 	if err := json.Unmarshal(message, &wsMessage); err != nil {
 		return err
@@ -158,8 +160,98 @@ func handleDriverMessage(driverID string, message []byte) error {
 	
 	log.Printf("收到司机消息: 司机ID=%s, 类型=%s", driverID, wsMessage.Type)
 	
-	// TODO: 根据消息类型处理不同的司机消息
-	// 例如：接受/拒绝行程、更新位置等
+	switch wsMessage.Type {
+	case contracts.DriverCmdTripAccept, contracts.DriverCmdTripDecline:
+		return handleDriverTripResponse(driverID, wsMessage, eventPublisher)
+	case contracts.DriverCmdLocation:
+		return handleDriverLocationUpdate(driverID, wsMessage, eventPublisher)
+	default:
+		log.Printf("未知的司机消息类型: %s", wsMessage.Type)
+	}
+	
+	return nil
+}
+
+// handleDriverTripResponse 处理司机行程响应
+func handleDriverTripResponse(driverID string, wsMessage contracts.WSMessage, eventPublisher *events.GatewayEventPublisher) error {
+	// 解析响应数据
+	var responseData map[string]interface{}
+	if err := json.Unmarshal(wsMessage.Data.([]byte), &responseData); err != nil {
+		return err
+	}
+	
+	tripID, ok := responseData["tripID"].(string)
+	if !ok {
+		return fmt.Errorf("缺少行程ID")
+	}
+	
+	riderID, ok := responseData["riderID"].(string)
+	if !ok {
+		return fmt.Errorf("缺少乘客ID")
+	}
+	
+	accept := wsMessage.Type == contracts.DriverCmdTripAccept
+	
+	// 创建响应数据
+	response := map[string]interface{}{
+		"tripID":   tripID,
+		"riderID":  riderID,
+		"driverID": driverID,
+		"accept":   accept,
+	}
+	
+	// 发布司机响应命令到RabbitMQ
+	if eventPublisher != nil {
+		response := events.DriverTripResponse{
+			TripID:   tripID,
+			RiderID:  riderID,
+			DriverID: driverID,
+			Accept:   accept,
+		}
+		
+		if err := eventPublisher.PublishDriverTripResponse(context.Background(), response); err != nil {
+			log.Printf("发布司机响应命令失败: %v", err)
+		}
+	} else {
+		log.Printf("事件发布器未初始化，无法发布司机响应")
+	}
+	
+	return nil
+}
+
+// handleDriverLocationUpdate 处理司机位置更新
+func handleDriverLocationUpdate(driverID string, wsMessage contracts.WSMessage, eventPublisher *events.GatewayEventPublisher) error {
+	// 解析位置数据
+	var locationData map[string]interface{}
+	if err := json.Unmarshal(wsMessage.Data.([]byte), &locationData); err != nil {
+		return err
+	}
+	
+	latitude, ok := locationData["latitude"].(float64)
+	if !ok {
+		return fmt.Errorf("缺少纬度信息")
+	}
+	
+	longitude, ok := locationData["longitude"].(float64)
+	if !ok {
+		return fmt.Errorf("缺少经度信息")
+	}
+	
+	// 发布司机位置更新事件
+	if eventPublisher != nil {
+		locationUpdate := events.DriverLocationUpdate{
+			DriverID:  driverID,
+			Latitude:  latitude,
+			Longitude: longitude,
+			Timestamp: time.Now().Unix(),
+		}
+		
+		if err := eventPublisher.PublishDriverLocationUpdate(context.Background(), locationUpdate); err != nil {
+			log.Printf("发布司机位置更新命令失败: %v", err)
+		}
+	} else {
+		log.Printf("事件发布器未初始化，无法发布司机位置更新")
+	}
 	
 	return nil
 }

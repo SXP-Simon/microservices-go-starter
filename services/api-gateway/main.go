@@ -34,18 +34,32 @@ func main() {
 	}
 	defer subscriber.Close()
 
+	// 初始化事件发布器
+	publisher, err := sharedEvents.NewRabbitMQPublisher(eventConfig.URL, eventConfig.Exchange)
+	if err != nil {
+		log.Fatalf("创建事件发布器失败: %v", err)
+	}
+	defer publisher.Close()
+
 	// 创建事件订阅器并订阅事件
 	gatewayEventSubscriber := events.NewGatewayEventSubscriber(subscriber, wsManager)
 	if err := gatewayEventSubscriber.SubscribeToAllEvents(context.Background()); err != nil {
 		log.Fatalf("订阅事件失败: %v", err)
 	}
+	
+	// 创建API网关事件发布器
+	apiEventPublisher := events.NewAPIEventPublisher(publisher)
 
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("POST /trip/preview", enableCORS(HandleTripPreview))
 	mux.HandleFunc("POST /trip/start", enableCORS(HandleTripStart))
-	mux.HandleFunc("/ws/riders", HandleRidersWebSocket)
-	mux.HandleFunc("/ws/drivers", HandleDriversWebSocket)
+	mux.HandleFunc("/ws/riders", func(w http.ResponseWriter, r *http.Request) {
+		websocket.HandleRidersWebSocket(wsManager, apiEventPublisher, w, r)
+	})
+	mux.HandleFunc("/ws/drivers", func(w http.ResponseWriter, r *http.Request) {
+		websocket.HandleDriversWebSocket(wsManager, apiEventPublisher, w, r)
+	})
 
 	server := &http.Server{
 		Addr:    httpAddr,

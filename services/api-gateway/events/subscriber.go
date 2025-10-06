@@ -58,6 +58,16 @@ func (s *GatewayEventSubscriber) SubscribeToAllEvents(ctx context.Context) error
 		return fmt.Errorf("订阅未找到司机事件失败: %w", err)
 	}
 
+	// 订阅司机行程请求事件
+	err = s.subscriber.Subscribe(
+		"notify_drivers_queue",
+		contracts.DriverCmdTripRequest,
+		s.handleDriverTripRequest,
+	)
+	if err != nil {
+		return fmt.Errorf("订阅司机行程请求事件失败: %w", err)
+	}
+
 	// 订阅支付会话创建事件
 	err = s.subscriber.Subscribe(
 		"notify_payment_status_queue",
@@ -66,6 +76,26 @@ func (s *GatewayEventSubscriber) SubscribeToAllEvents(ctx context.Context) error
 	)
 	if err != nil {
 		return fmt.Errorf("订阅支付会话创建事件失败: %w", err)
+	}
+
+	// 订阅支付成功事件
+	err = s.subscriber.Subscribe(
+		"notify_payment_success_queue",
+		contracts.PaymentEventSuccess,
+		s.handlePaymentSuccess,
+	)
+	if err != nil {
+		return fmt.Errorf("订阅支付成功事件失败: %w", err)
+	}
+
+	// 订阅支付失败事件
+	err = s.subscriber.Subscribe(
+		"notify_payment_failed_queue",
+		contracts.PaymentEventFailed,
+		s.handlePaymentFailed,
+	)
+	if err != nil {
+		return fmt.Errorf("订阅支付失败事件失败: %w", err)
 	}
 
 	log.Println("成功订阅所有事件")
@@ -186,6 +216,85 @@ func (s *GatewayEventSubscriber) handlePaymentSessionCreated(data []byte) error 
 	}
 
 	log.Printf("已发送支付会话创建事件: 行程ID=%s", tripID)
+	return nil
+}
+
+// handleDriverTripRequest 处理司机行程请求事件
+func (s *GatewayEventSubscriber) handleDriverTripRequest(data []byte) error {
+	var requestData map[string]interface{}
+	if err := json.Unmarshal(data, &requestData); err != nil {
+		return fmt.Errorf("解析司机行程请求事件失败: %w", err)
+	}
+
+	driverID, ok := requestData["driverID"].(string)
+	if !ok {
+		return fmt.Errorf("事件数据中缺少driverID")
+	}
+
+	// 向特定司机发送行程请求
+	message := contracts.WSMessage{
+		Type: contracts.DriverCmdTripRequest,
+		Data: requestData,
+	}
+
+	if err := s.wsManager.SendToDriver(driverID, message); err != nil {
+		log.Printf("向司机发送行程请求失败: %v", err)
+	}
+
+	log.Printf("已向司机发送行程请求: 司机ID=%s, 行程ID=%v",
+		driverID, requestData["tripID"])
+	return nil
+}
+
+// handlePaymentSuccess 处理支付成功事件
+func (s *GatewayEventSubscriber) handlePaymentSuccess(data []byte) error {
+	var paymentData map[string]interface{}
+	if err := json.Unmarshal(data, &paymentData); err != nil {
+		return fmt.Errorf("解析支付成功事件失败: %w", err)
+	}
+
+	tripID, ok := paymentData["tripID"].(string)
+	if !ok {
+		return fmt.Errorf("事件数据中缺少tripID")
+	}
+
+	message := contracts.WSMessage{
+		Type: contracts.PaymentEventSuccess,
+		Data: paymentData,
+	}
+
+	// 向所有乘客广播（简化处理）
+	if err := s.wsManager.BroadcastToRiders(message); err != nil {
+		log.Printf("广播支付成功事件失败: %v", err)
+	}
+
+	log.Printf("已发送支付成功事件: 行程ID=%s", tripID)
+	return nil
+}
+
+// handlePaymentFailed 处理支付失败事件
+func (s *GatewayEventSubscriber) handlePaymentFailed(data []byte) error {
+	var paymentData map[string]interface{}
+	if err := json.Unmarshal(data, &paymentData); err != nil {
+		return fmt.Errorf("解析支付失败事件失败: %w", err)
+	}
+
+	tripID, ok := paymentData["tripID"].(string)
+	if !ok {
+		return fmt.Errorf("事件数据中缺少tripID")
+	}
+
+	message := contracts.WSMessage{
+		Type: contracts.PaymentEventFailed,
+		Data: paymentData,
+	}
+
+	// 向所有乘客广播（简化处理）
+	if err := s.wsManager.BroadcastToRiders(message); err != nil {
+		log.Printf("广播支付失败事件失败: %v", err)
+	}
+
+	log.Printf("已发送支付失败事件: 行程ID=%s", tripID)
 	return nil
 }
 

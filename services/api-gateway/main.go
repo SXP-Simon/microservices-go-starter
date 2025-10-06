@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"ride-sharing/api-gateway/events"
+	"ride-sharing/api-gateway/websocket"
+	sharedEvents "ride-sharing/shared/events"
 	"syscall"
 	"time"
 
@@ -17,7 +20,25 @@ var (
 )
 
 func main() {
-	log.Println("Starting API Gateway")
+	log.Println("启动API网关")
+
+	// 初始化WebSocket管理器
+	wsManager = websocket.NewWebSocketManager()
+	defer wsManager.Close()
+
+	// 初始化事件订阅器
+	eventConfig := sharedEvents.NewTripExchangeConfig()
+	subscriber, err := sharedEvents.NewRabbitMQSubscriber(eventConfig.URL, eventConfig.Exchange)
+	if err != nil {
+		log.Fatalf("创建事件订阅器失败: %v", err)
+	}
+	defer subscriber.Close()
+
+	// 创建事件订阅器并订阅事件
+	gatewayEventSubscriber := events.NewGatewayEventSubscriber(subscriber, wsManager)
+	if err := gatewayEventSubscriber.SubscribeToAllEvents(context.Background()); err != nil {
+		log.Fatalf("订阅事件失败: %v", err)
+	}
 
 	mux := http.NewServeMux()
 
@@ -34,7 +55,7 @@ func main() {
 	serverErrors := make(chan error, 1)
 
 	go func() {
-		log.Printf("Server is listeneing on %s", httpAddr)
+		log.Printf("服务器正在监听端口 %s", httpAddr)
 		serverErrors <- server.ListenAndServe()
 	}()
 
@@ -43,17 +64,16 @@ func main() {
 
 	select {
 	case err := <-serverErrors:
-		log.Printf("Error starting the server: %v", err)
+		log.Printf("服务器启动错误: %v", err)
 	case sig := <-shutdown:
-		log.Printf("Server is shutting down due to %v signal", sig)
+		log.Printf("服务器正在关闭，收到信号: %v", sig)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		if err := server.Shutdown(ctx); err != nil {
-			log.Printf("Could not stop the server gracefully %v", err)
+			log.Printf("无法优雅关闭服务器: %v", err)
 			server.Close()
 		}
 	}
-
 }

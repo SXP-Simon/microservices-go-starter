@@ -6,7 +6,7 @@ option go_package = "shared/proto/trip;trip";
 
 service TripService {
   rpc PreviewTrip  (PreviewTripRequest) returns (PreviewTripResponse);
-  rpc CreateTrip (CreteTripRequest) returns (CreateTripResponse);
+  rpc CreateTrip (CreateTripRequest) returns (CreateTripResponse);
 }
 
 message PreviewTripRequest{
@@ -43,7 +43,7 @@ message RideFare{
   double totalPriceInCents = 4;
 }
 
-message CreteTripRequest{
+message CreateTripRequest{
   string rideFareID = 1;
   string userID = 2;
 
@@ -68,5 +68,5 @@ message TripDriver{
   string id = 1;
   string name = 2;
   string profilePicture = 3;
-  string carPalate = 4;
+  string carPlate = 4;
 }

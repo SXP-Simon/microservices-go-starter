@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package payment;
+
+option go_package = "shared/proto/payment;payment";
+
+service PaymentService {
+  rpc CreatePaymentSession(CreatePaymentSessionRequest) returns (CreatePaymentSessionResponse);
+  rpc GetPaymentByTripId(GetPaymentByTripIdRequest) returns (GetPaymentByTripIdResponse);
+  rpc ProcessWebhook(WebhookRequest) returns (WebhookResponse);
+}
+
+message CreatePaymentSessionRequest {
+  string tripId = 1;
+  string userId = 2;
+  double amount = 3;
+  string currency = 4;
+}
+
+message CreatePaymentSessionResponse {
+  string paymentId = 1;
+  string sessionId = 2;
+  double amount = 3;
+  string currency = 4;
+  string status = 5;
+}
+
+message GetPaymentByTripIdRequest {
+  string tripId = 1;
+}
+
+message GetPaymentByTripIdResponse {
+  string paymentId = 1;
+  string tripId = 2;
+  string userId = 3;
+  double amount = 4;
+  string currency = 5;
+  string status = 6;
+  string sessionId = 7;
+  string createdAt = 8;
+  string updatedAt = 9;
+}
+
+message WebhookRequest {
+  string data = 1;
+}
+
+message WebhookResponse {
+  bool success = 1;
+}

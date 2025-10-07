@@ -25,7 +25,7 @@ func NewGRPCHandler(server *grpc.Server, service domain.TripService) *gRPCHandle
 
 	return handler
 }
-func (h *gRPCHandler) CreateTrip(ctx context.Context, req *pb.CreteTripRequest) (*pb.CreateTripResponse, error) {
+func (h *gRPCHandler) CreateTrip(ctx context.Context, req *pb.CreateTripRequest) (*pb.CreateTripResponse, error) {
 
 	fareID := req.GetRideFareID()
 	userID := req.GetUserID()

@@ -3,18 +3,18 @@ package grpc
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"ride-sharing/payment-service/internal/domain"
+	pb "ride-sharing/shared/proto/payment"
 	"ride-sharing/payment-service/internal/service"
 )
 
 // gRPCHandler gRPC处理器
 type gRPCHandler struct {
+	pb.UnimplementedPaymentServiceServer
 	service service.PaymentService
 }
 
@@ -24,14 +24,14 @@ func NewGRPCHandler(server *grpc.Server, paymentService service.PaymentService) 
 		service: paymentService,
 	}
 
-	// 注册gRPC服务（这里需要定义proto文件）
-	// pb.RegisterPaymentServiceServer(server, handler)
+	// 注册gRPC服务
+	pb.RegisterPaymentServiceServer(server, handler)
 
 	return handler
 }
 
 // CreatePaymentSession 创建支付会话
-func (h *gRPCHandler) CreatePaymentSession(ctx context.Context, req *CreatePaymentSessionRequest) (*CreatePaymentSessionResponse, error) {
+func (h *gRPCHandler) CreatePaymentSession(ctx context.Context, req *pb.CreatePaymentSessionRequest) (*pb.CreatePaymentSessionResponse, error) {
 	// 验证请求参数
 	if req.TripId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "行程ID不能为空")
@@ -50,7 +50,7 @@ func (h *gRPCHandler) CreatePaymentSession(ctx context.Context, req *CreatePayme
 	}
 
 	// 构建响应
-	response := &CreatePaymentSessionResponse{
+	response := &pb.CreatePaymentSessionResponse{
 		PaymentId: payment.ID,
 		SessionId: payment.SessionID,
 		Amount:    payment.Amount,
@@ -63,7 +63,7 @@ func (h *gRPCHandler) CreatePaymentSession(ctx context.Context, req *CreatePayme
 }
 
 // GetPaymentByTripId 根据行程ID获取支付记录
-func (h *gRPCHandler) GetPaymentByTripId(ctx context.Context, req *GetPaymentByTripIdRequest) (*GetPaymentByTripIdResponse, error) {
+func (h *gRPCHandler) GetPaymentByTripId(ctx context.Context, req *pb.GetPaymentByTripIdRequest) (*pb.GetPaymentByTripIdResponse, error) {
 	// 验证请求参数
 	if req.TripId == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "行程ID不能为空")
@@ -76,7 +76,7 @@ func (h *gRPCHandler) GetPaymentByTripId(ctx context.Context, req *GetPaymentByT
 	}
 
 	// 构建响应
-	response := &GetPaymentByTripIdResponse{
+	response := &pb.GetPaymentByTripIdResponse{
 		PaymentId: payment.ID,
 		TripId:    payment.TripID,
 		UserId:    payment.UserID,
@@ -92,44 +92,7 @@ func (h *gRPCHandler) GetPaymentByTripId(ctx context.Context, req *GetPaymentByT
 	return response, nil
 }
 
-// 以下是临时的请求/响应结构体定义，实际应该从proto文件生成
-// TODO: 创建payment.proto文件并使用protoc生成代码
-
-type CreatePaymentSessionRequest struct {
-	TripId   string  `json:"tripId"`
-	UserId   string  `json:"userId"`
-	Amount   float64 `json:"amount"`
-	Currency string  `json:"currency"`
-}
-
-type CreatePaymentSessionResponse struct {
-	PaymentId string  `json:"paymentId"`
-	SessionId string  `json:"sessionId"`
-	Amount    float64 `json:"amount"`
-	Currency  string  `json:"currency"`
-	Status    string  `json:"status"`
-}
-
-type GetPaymentByTripIdRequest struct {
-	TripId string `json:"tripId"`
-}
-
-type GetPaymentByTripIdResponse struct {
-	PaymentId string `json:"paymentId"`
-	TripId    string `json:"tripId"`
-	UserId    string `json:"userId"`
-	Amount    float64 `json:"amount"`
-	Currency  string `json:"currency"`
-	Status    string `json:"status"`
-	SessionId string `json:"sessionId"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
-}
-
-// 为了让代码能够编译，这里添加一些临时的gRPC接口实现
-// 实际应用中应该从proto文件生成
-
-func (h *gRPCHandler) ProcessWebhook(ctx context.Context, req *WebhookRequest) (*WebhookResponse, error) {
+func (h *gRPCHandler) ProcessWebhook(ctx context.Context, req *pb.WebhookRequest) (*pb.WebhookResponse, error) {
 	log.Printf("收到支付Webhook请求: %+v", req)
 	
 	// 解析Webhook数据
@@ -155,12 +118,4 @@ func (h *gRPCHandler) ProcessWebhook(ctx context.Context, req *WebhookRequest) (
 	}
 	
 	return &WebhookResponse{Success: true}, nil
-}
-
-type WebhookRequest struct {
-	Data string `json:"data"`
-}
-
-type WebhookResponse struct {
-	Success bool `json:"success"`
 }
